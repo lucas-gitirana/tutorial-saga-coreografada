@@ -44,12 +44,14 @@ def ao_pedido_criado(estado: dict, dados: dict) -> list:
 # Etapa 4: a transação de COMPENSAÇÃO
 # ---------------------------------------------------------------------------
 def ao_pagamento_recusado(estado: dict, dados: dict) -> list:
-    # TODO (Etapa 4): desfaça a reserva feita em ao_pedido_criado.
-    #   1. Busque a reserva pelo id de correlação: estado["reservas"].get(dados["pedido_id"])
-    #   2. Se não existe ou o status não é "RESERVADA", devolva [] (nada a compensar).
-    #   3. Devolva a quantidade a estado["disponivel"][produto] e marque o status "LIBERADA".
-    #   4. Devolva [evento("EstoqueLiberado", pedido_id=..., produto=..., quantidade=...)]
-    raise NotImplementedError("Etapa 4: implemente ao_pagamento_recusado em servicos/estoque/estoque.py")
+    reserva = estado["reservas"].get(dados["pedido_id"])
+    if reserva is None or reserva["status"] != "RESERVADA":
+        return []  # nada a compensar (ou já compensado)
+
+    estado["disponivel"][reserva["produto"]] += reserva["quantidade"]
+    reserva["status"] = "LIBERADA"
+    return [evento("EstoqueLiberado", pedido_id=dados["pedido_id"],
+                   produto=reserva["produto"], quantidade=reserva["quantidade"])]
 
 
 TRATADORES = {

@@ -23,18 +23,18 @@ def evento(tipo: str, **dados) -> dict:
 def ao_estoque_reservado(estado: dict, dados: dict) -> list:
     pedido_id, cliente, valor = dados["pedido_id"], dados["cliente"], dados["valor_total"]
 
-    # TODO (Etapa 2): implemente a transação local do pagamento.
-    #   0. Idempotência: se pedido_id já está em estado["pagamentos"], devolva [].
-    #   1. Leia o saldo: estado["saldos"].get(cliente, 0.0)
-    #   2. Saldo menor que o valor:
-    #        - registre estado["pagamentos"][pedido_id] = {"cliente", "valor", "status": "RECUSADO"}
-    #        - devolva [evento("PagamentoRecusado", pedido_id=..., cliente=..., valor_total=...,
-    #                          motivo="saldo insuficiente")]
-    #   3. Senão:
-    #        - debite o valor de estado["saldos"][cliente]
-    #        - registre estado["pagamentos"][pedido_id] com "status": "APROVADO"
-    #        - devolva [evento("PagamentoAprovado", pedido_id=..., cliente=..., valor_total=...)]
-    raise NotImplementedError("Etapa 2: implemente ao_estoque_reservado em servicos/pagamentos/pagamentos.py")
+    if pedido_id in estado["pagamentos"]:
+        return []  # idempotência: este pedido já foi cobrado (ou recusado)
+
+    saldo = estado["saldos"].get(cliente, 0.0)
+    if saldo < valor:
+        estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": "RECUSADO"}
+        return [evento("PagamentoRecusado", pedido_id=pedido_id, cliente=cliente, valor_total=valor,
+                       motivo=f"saldo insuficiente (saldo {saldo:.2f}, valor {valor:.2f})")]
+
+    estado["saldos"][cliente] = round(saldo - valor, 2)
+    estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": "APROVADO"}
+    return [evento("PagamentoAprovado", pedido_id=pedido_id, cliente=cliente, valor_total=valor)]
 
 
 TRATADORES = {

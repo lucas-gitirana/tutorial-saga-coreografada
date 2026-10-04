@@ -74,16 +74,21 @@ def ao_pagamento_aprovado(estado: dict, dados: dict) -> list:
 # Etapa 3: os caminhos de falha
 # ---------------------------------------------------------------------------
 def ao_estoque_indisponivel(estado: dict, dados: dict) -> list:
-    # TODO (Etapa 3): siga o exemplo de ao_pagamento_aprovado, logo acima.
-    #   - use _pedido_pendente(estado, dados): se devolver None, devolva []
-    #   - status "CANCELADO" e motivo "estoque indisponível"
-    #   - devolva [evento("PedidoCancelado", pedido_id=..., motivo=...)]
-    raise NotImplementedError("Etapa 3: implemente ao_estoque_indisponivel em servicos/pedidos/pedidos.py")
+    pedido = _pedido_pendente(estado, dados)
+    if pedido is None:
+        return []
+    pedido["status"] = "CANCELADO"
+    pedido["motivo"] = "estoque indisponível"
+    return [evento("PedidoCancelado", pedido_id=pedido["pedido_id"], motivo=pedido["motivo"])]
 
 
 def ao_pagamento_recusado(estado: dict, dados: dict) -> list:
-    # TODO (Etapa 3): igual ao anterior, mas o motivo vem do evento: dados["motivo"]
-    raise NotImplementedError("Etapa 3: implemente ao_pagamento_recusado em servicos/pedidos/pedidos.py")
+    pedido = _pedido_pendente(estado, dados)
+    if pedido is None:
+        return []
+    pedido["status"] = "CANCELADO"
+    pedido["motivo"] = dados["motivo"]
+    return [evento("PedidoCancelado", pedido_id=pedido["pedido_id"], motivo=pedido["motivo"])]
 
 
 TRATADORES = {
