@@ -1,0 +1,83 @@
+# Ambiente do tutorial Saga Coreografada.
+#   pedidos    -> inicia a saga          (http://localhost:8031)
+#   estoque    -> reserva / libera       (http://localhost:8032)
+#   pagamentos -> cobra o cliente        (http://localhost:8033)
+#   redis      -> barramento de eventos (Redis Streams). Não há orquestrador!
+name: tutorial-saga-coreografada
+
+services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  pedidos:
+    build: ./servicos
+    volumes:
+      - ./servicos/pedidos:/app      # código montado: basta reiniciar o container
+      - ./servicos/comum:/comum
+      - dados-pedidos:/dados         # banco de dados PRÓPRIO do serviço
+    environment:
+      PYTHONPATH: /comum
+      REDIS_URL: redis://redis:6379/0
+      ARQUIVO_ESTADO: /dados/pedidos.json
+    ports:
+      - "8031:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  estoque:
+    build: ./servicos
+    volumes:
+      - ./servicos/estoque:/app      # código montado: basta reiniciar o container
+      - ./servicos/comum:/comum
+      - dados-estoque:/dados         # banco de dados PRÓPRIO do serviço
+    environment:
+      PYTHONPATH: /comum
+      REDIS_URL: redis://redis:6379/0
+      ARQUIVO_ESTADO: /dados/estoque.json
+    ports:
+      - "8032:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  pagamentos:
+    build: ./servicos
+    volumes:
+      - ./servicos/pagamentos:/app      # código montado: basta reiniciar o container
+      - ./servicos/comum:/comum
+      - dados-pagamentos:/dados         # banco de dados PRÓPRIO do serviço
+    environment:
+      PYTHONPATH: /comum
+      REDIS_URL: redis://redis:6379/0
+      ARQUIVO_ESTADO: /dados/pagamentos.json
+    ports:
+      - "8033:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  dados-pedidos:
+  dados-estoque:
+  dados-pagamentos:
