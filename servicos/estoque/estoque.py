@@ -15,6 +15,7 @@ ESTADO_INICIAL = {
 
 
 def evento(tipo: str, **dados) -> dict:
+    """evento("X", a=1) devolve {"tipo": "X", "dados": {"a": 1}}."""
     return {"tipo": tipo, "dados": dados}
 
 
@@ -41,17 +42,25 @@ def ao_pedido_criado(estado: dict, dados: dict) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Etapa 4: a transação de COMPENSAÇÃO
+# Etapa 9: a transação de COMPENSAÇÃO
 # ---------------------------------------------------------------------------
 def ao_pagamento_recusado(estado: dict, dados: dict) -> list:
+    # O PagamentoRecusado NÃO diz qual produto foi reservado. Quem sabe é o
+    # próprio estoque: ele guardou a reserva pelo id de correlação (pedido_id).
     reserva = estado["reservas"].get(dados["pedido_id"])
-    if reserva is None or reserva["status"] != "RESERVADA":
-        return []  # nada a compensar (ou já compensado)
+    # reserva é None (pedido desconhecido) ou um dicionário como este:
+    #   {"produto": "monitor", "quantidade": 1, "status": "RESERVADA"}
 
-    estado["disponivel"][reserva["produto"]] += reserva["quantidade"]
+    # ═══ Etapa 9 · COMPENSAR: desfazer a reserva ═══════════════════════════
+    # ✏️  Escreva aqui o `if` de idempotência e as linhas que devolvem o estoque.
+    if reserva is None or reserva["status"] != "RESERVADA":
+        return []    # nada a compensar (pedido sem reserva ou já compensado)
+
+    produto, quantidade = reserva["produto"], reserva["quantidade"]
+    estado["disponivel"][produto] = estado["disponivel"].get(produto, 0) + quantidade
     reserva["status"] = "LIBERADA"
-    return [evento("EstoqueLiberado", pedido_id=dados["pedido_id"],
-                   produto=reserva["produto"], quantidade=reserva["quantidade"])]
+    return [evento("EstoqueLiberado", pedido_id=dados["pedido_id"], produto=produto, quantidade=quantidade)]
+
 
 
 TRATADORES = {

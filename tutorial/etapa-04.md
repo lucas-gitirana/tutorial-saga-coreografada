@@ -1,49 +1,88 @@
-# Etapa 4 — Transação de compensação
+![Mapa: pagamentos](tutorial/img/mapa-pagamentos.svg)
 
-**Objetivo:** desfazer a reserva de estoque quando o pagamento é recusado.
+📍 **Você está aqui:** dentro do `pagamentos`. Você vai escrever o tratador
+`ao_estoque_reservado`, em três etapas curtas:
 
-Numa saga não existe *rollback*: a reserva **já foi gravada** no banco do
-estoque. O que dá para fazer é executar uma nova transação que **compensa** a
-anterior. Cada ação da saga que pode precisar ser desfeita tem a sua
-compensação:
-
-| Ação | Compensação |
+| Caso | Etapa |
 | --- | --- |
-| reservar estoque (`ao_pedido_criado`) | liberar a reserva (`ao_pagamento_recusado`) |
+| saldo suficiente: **cobrar e aprovar** | **esta** |
+| saldo insuficiente: recusar | 5 |
+| o mesmo evento chegou duas vezes: ignorar | 6 |
 
-## O que implementar em `ao_pagamento_recusado`
+## O que entra e o que sai
 
-No arquivo `servicos/estoque/estoque.py`:
+Um **tratador** é uma função que recebe um evento, altera o banco do serviço e
+devolve os eventos que quer publicar.
 
-1. Encontre a reserva pelo **id de correlação**:
-   `estado["reservas"].get(dados["pedido_id"])`. O evento `PagamentoRecusado`
-   nem traz o produto. É o estoque que sabe, pelos **seus próprios dados**, o
-   que reservou para aquele pedido.
-2. Se a reserva não existe ou não está `"RESERVADA"`, devolva `[]`
-   (idempotência: nada a compensar).
-3. Devolva a quantidade para `estado["disponivel"][produto]` e mude o status
-   da reserva para `"LIBERADA"`.
-4. Publique `EstoqueLiberado` com `pedido_id`, `produto` e `quantidade`.
+**Entra** (publicado pelo estoque):
 
-## Teste no serviço
-
-Ao reiniciar, o estoque reprocessa o `PagamentoRecusado` do bruno, que ficou
-pendente na Etapa 3:
-
-```bash
-docker compose restart estoque && sleep 3
-curl -s -w '\n' localhost:8032/estoque
+```json
+{
+  "tipo": "EstoqueReservado",
+  "dados": { "pedido_id": "ana-1", "cliente": "ana", "produto": "teclado", "quantidade": 2, "valor_total": 300.0 }
+}
 ```
 
-Os 2 monitores estão disponíveis de novo, e a reserva do bruno aparece como `LIBERADA`.
+**Sai** (o `pedidos` vai ouvir):
 
-```bash
-PEDIDO_BRUNO=$(python3 -c 'import json; print(json.load(open("/tmp/pedido-bruno.json"))["pedido_id"])')
-curl -s localhost:8031/pedidos/$PEDIDO_BRUNO/historico
+```json
+{
+  "tipo": "PagamentoAprovado",
+  "dados": { "pedido_id": "ana-1", "cliente": "ana", "valor_total": 300.0 }
+}
 ```
 
-O `EstoqueLiberado` aparece bem depois dos outros eventos: a compensação
-aconteceu **eventualmente**. Em uma saga, o sistema passa por estados
-intermediários inconsistentes e converge para a consistência.
+O `pagamentos` não sabe **quem** vai ouvir o `PagamentoAprovado`. Ele só
+publica. Cada serviço conhece **eventos**, não outros serviços.
 
-Clique em **Verificar**. A verificação testa `estoque.py` diretamente.
+## 🐍 Python rápido
+
+| Código | Significa |
+| --- | --- |
+| `estado["saldos"][cliente] = 700.0` | troca o saldo do cliente no banco do serviço |
+| `estado["pagamentos"][pedido_id] = {...}` | guarda um registro novo, na chave `pedido_id` |
+| `return [evento("X", a=1)]` | termina a função devolvendo a lista de eventos a publicar. `evento("X", a=1)` vira `{"tipo": "X", "dados": {"a": 1}}` |
+
+## ✏️ Faça
+
+Abaixo do marcador **Etapa 4** (o último da função), escreva as 3 linhas e
+complete os `___`:
+
+```python
+    estado["saldos"][cliente] = saldo - ___
+    estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": "APROVADO"}
+    return [evento("PagamentoAprovado", pedido_id=pedido_id, cliente=cliente, valor_total=___)]
+```
+
+> Atenção à **indentação**: 4 espaços, alinhado com `saldo = ...`.
+> As variáveis `pedido_id`, `cliente`, `valor` e `saldo` já estão prontas no topo da função.
+
+**Salve** o arquivo (`Ctrl+S`).
+
+## 🧪 Teste: a saga da `ana` continua sozinha
+
+Ao salvar, o `pagamentos` reinicia e pega o evento que estava **pendente**.
+Espere 3 segundos e veja a linha do tempo:
+
+```bash
+curl -s localhost:8031/pedidos/ana-1/historico
+```
+
+```text
++   0.0 s   pedidos    publicou  PedidoCriado
++   0.0 s   estoque    publicou  EstoqueReservado
++  95.3 s   pagamentos publicou  PagamentoAprovado
++  95.3 s   pedidos    publicou  PedidoConfirmado
+```
+
+O `pedidos` já sabia reagir ao `PagamentoAprovado` (é o exemplo pronto em
+`pedidos.py`) e **confirmou** o pedido. Confira o saldo da `ana`: deve ser **700**.
+
+```bash
+curl -s localhost:8033/carteiras
+```
+
+## Clique em Verificar ✔
+
+> Deu erro de conexão? Pode ser um erro de digitação no Python. Veja com
+> `docker compose logs pagamentos --tail 20`.

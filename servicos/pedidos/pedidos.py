@@ -12,7 +12,8 @@ lista de eventos a publicar.
 """
 from __future__ import annotations
 
-import uuid
+import re
+import unicodedata
 
 PRECOS = {"teclado": 150.0, "mouse": 80.0, "monitor": 900.0}
 
@@ -24,7 +25,18 @@ class ErroDePedido(Exception):
 
 
 def evento(tipo: str, **dados) -> dict:
+    """evento("X", a=1) devolve {"tipo": "X", "dados": {"a": 1}}."""
     return {"tipo": tipo, "dados": dados}
+
+
+def _novo_id(estado: dict, cliente: str) -> str:
+    """Id de correlação legível: <cliente>-<n> (ana-1, ana-2, bruno-1...)."""
+    sem_acento = unicodedata.normalize("NFKD", cliente).encode("ascii", "ignore").decode()
+    base = re.sub(r"[^a-z0-9]+", "-", sem_acento.lower()).strip("-") or "pedido"
+    numero = 1
+    while f"{base}-{numero}" in estado["pedidos"]:
+        numero += 1
+    return f"{base}-{numero}"
 
 
 def criar_pedido(estado: dict, cliente: str, produto: str, quantidade: int) -> tuple[dict, list]:
@@ -37,7 +49,7 @@ def criar_pedido(estado: dict, cliente: str, produto: str, quantidade: int) -> t
         raise ErroDePedido("A 'quantidade' deve ser um inteiro maior que zero.")
 
     pedido = {
-        "pedido_id": uuid.uuid4().hex[:8],  # id de correlação: acompanha todos os eventos da saga
+        "pedido_id": _novo_id(estado, cliente),  # id de correlação: acompanha todos os eventos da saga
         "cliente": cliente,
         "produto": produto,
         "quantidade": quantidade,
@@ -71,24 +83,32 @@ def ao_pagamento_aprovado(estado: dict, dados: dict) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Etapa 3: os caminhos de falha
+# Etapas 7 e 8: os caminhos de falha
 # ---------------------------------------------------------------------------
 def ao_estoque_indisponivel(estado: dict, dados: dict) -> list:
     pedido = _pedido_pendente(estado, dados)
+
+    # ═══ Etapa 7 · faltou estoque: cancelar o pedido ═══════════════════════
+    # ✏️  Escreva aqui (siga o exemplo de ao_pagamento_aprovado, logo acima).
     if pedido is None:
-        return []
+        return []    # pedido desconhecido ou que já teve desfecho
     pedido["status"] = "CANCELADO"
     pedido["motivo"] = "estoque indisponível"
     return [evento("PedidoCancelado", pedido_id=pedido["pedido_id"], motivo=pedido["motivo"])]
 
 
+
 def ao_pagamento_recusado(estado: dict, dados: dict) -> list:
     pedido = _pedido_pendente(estado, dados)
+
+    # ═══ Etapa 8 · pagamento recusado: cancelar o pedido ═══════════════════
+    # ✏️  Escreva aqui (igual à Etapa 7, mas o motivo vem do evento).
     if pedido is None:
         return []
     pedido["status"] = "CANCELADO"
-    pedido["motivo"] = dados["motivo"]
+    pedido["motivo"] = dados["motivo"]         # o motivo que veio no evento
     return [evento("PedidoCancelado", pedido_id=pedido["pedido_id"], motivo=pedido["motivo"])]
+
 
 
 TRATADORES = {

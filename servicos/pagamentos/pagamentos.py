@@ -14,27 +14,41 @@ ESTADO_INICIAL = {
 
 
 def evento(tipo: str, **dados) -> dict:
+    """evento("X", a=1) devolve {"tipo": "X", "dados": {"a": 1}}."""
     return {"tipo": tipo, "dados": dados}
 
 
 # ---------------------------------------------------------------------------
-# Etapa 2: a transação local do pagamento
+# Etapas 4, 5 e 6: a transação local do pagamento
 # ---------------------------------------------------------------------------
 def ao_estoque_reservado(estado: dict, dados: dict) -> list:
-    pedido_id, cliente, valor = dados["pedido_id"], dados["cliente"], dados["valor_total"]
+    pedido_id = dados["pedido_id"]               # id de correlação, ex.: "ana-1"
+    cliente = dados["cliente"]                   # ex.: "ana"
+    valor = dados["valor_total"]                 # ex.: 300.0
+    saldo = estado["saldos"].get(cliente, 0.0)   # quanto o cliente tem na carteira
 
+    # ═══ Etapa 6 · IDEMPOTÊNCIA: este pedido já foi cobrado? ═══════════════
+    # ✏️  Escreva aqui o `if` que ignora um evento repetido.
     if pedido_id in estado["pagamentos"]:
-        return []  # idempotência: este pedido já foi cobrado (ou recusado)
+        return []    # já processado: não cobra de novo e não publica nada
 
-    saldo = estado["saldos"].get(cliente, 0.0)
+
+
+    # ═══ Etapa 5 · SALDO INSUFICIENTE: recusar ═════════════════════════════
+    # ✏️  Escreva aqui o `if` que recusa o pagamento.
     if saldo < valor:
         estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": "RECUSADO"}
         return [evento("PagamentoRecusado", pedido_id=pedido_id, cliente=cliente, valor_total=valor,
-                       motivo=f"saldo insuficiente (saldo {saldo:.2f}, valor {valor:.2f})")]
+                       motivo="saldo insuficiente")]
 
-    estado["saldos"][cliente] = round(saldo - valor, 2)
+
+
+    # ═══ Etapa 4 · SALDO SUFICIENTE: cobrar e aprovar ══════════════════════
+    # ✏️  Escreva aqui as 3 linhas: debitar, registrar e devolver o evento.
+    estado["saldos"][cliente] = saldo - valor
     estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": "APROVADO"}
     return [evento("PagamentoAprovado", pedido_id=pedido_id, cliente=cliente, valor_total=valor)]
+
 
 
 TRATADORES = {

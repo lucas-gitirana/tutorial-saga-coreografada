@@ -1,83 +1,89 @@
-# Padrão Saga Coreografada na prática
+## O problema
 
-**Tempo estimado:** 40 minutos · **Linguagem:** Python (Flask) · **Infra:** Docker Compose + Redis
+Numa loja online, **uma compra** mexe em **três serviços**, e cada um tem o
+**seu próprio banco de dados**:
 
-## O problema: transações que cruzam serviços
+| Serviço | O que faz na compra |
+| --- | --- |
+| **pedidos** | registra o pedido |
+| **estoque** | reserva o produto |
+| **pagamentos** | cobra o cliente |
 
-Em microsserviços, **cada serviço tem o seu próprio banco de dados**. Uma
-operação de negócio como "fazer um pedido" precisa mexer em três deles:
+Num sistema com um banco só, uma **transação** resolveria: ou tudo acontece, ou
+nada acontece. Mas não existe transação que abrace **três bancos diferentes**.
 
-- **pedidos**: registrar o pedido;
-- **estoque**: reservar o produto;
-- **pagamentos**: cobrar o cliente.
-
-Não existe uma transação ACID que abranja três bancos diferentes. Se o
-pagamento falhar depois de o estoque ser reservado, quem desfaz a reserva?
+E se o pagamento falhar **depois** que o estoque já reservou o produto?
+**Quem desfaz a reserva?**
 
 ## A ideia da Saga
 
-Uma **saga** é uma sequência de **transações locais**, uma em cada serviço.
-Cada etapa faz a sua parte, grava no seu banco e publica um evento que dispara
-a próxima. Se uma etapa falha, as anteriores são desfeitas por **transações de
-compensação**. O sistema não volta exatamente ao estado inicial, mas fica
-**consistente** com ele (Nadareishvili *et al.*, 2016).
-
-Na saga **coreografada** não existe um coordenador central. Cada serviço
-**escuta os eventos dos outros e reage** (Richardson, 2018). Dois princípios
-guiam a implementação:
-
-1. cada participante **atualiza o seu banco e publica um evento**;
-2. cada participante usa um **id de correlação** (aqui, o `pedido_id`) para
-   ligar os eventos que recebe aos seus próprios dados.
-
-## O cenário
+Uma **saga** quebra a compra em **transações locais**, uma em cada serviço.
+Cada serviço faz a sua parte, grava no seu banco e **avisa** o próximo com um
+**evento**. Se um passo falha, os anteriores são desfeitos por **transações de
+compensação**:
 
 ```text
-                      ┌──────────────────────── Redis Stream: saga.eventos ────────────────────────┐
-                      │                                                                             │
- POST /pedidos ─▶ [pedidos] ──PedidoCriado──▶ [estoque] ──EstoqueReservado──▶ [pagamentos]         │
-   (8031)             ▲          (8032)          │                                  │   (8033)      │
-                      │                          │ EstoqueIndisponivel              │               │
-                      │◀─────────────────────────┘                                  │               │
-                      │◀──────────────────────── PagamentoAprovado ─────────────────┤               │
-                      │◀──────────────────────── PagamentoRecusado ─────────────────┘               │
-                      │                              │                                              │
-                      │                              ▼                                              │
-                      │                          [estoque] ── COMPENSAÇÃO: libera a reserva         │
-                      └─────────────────────────────────────────────────────────────────────────────┘
+deu certo:    pedidos cria ─▶ estoque reserva ─▶ pagamentos cobra  ─▶ pedidos CONFIRMA ✔
+deu errado:   pedidos cria ─▶ estoque reserva ─▶ pagamentos RECUSA ─▶ pedidos CANCELA  ✘
+                                    ▲                    │
+                                    └────────────────────┘  estoque DEVOLVE a reserva (compensação)
 ```
 
-| Evento | Publicado por | Quem reage |
+## Coreografada: sem maestro
+
+Existem dois jeitos de coordenar uma saga:
+
+| | Orquestrada | **Coreografada** (este tutorial) |
 | --- | --- | --- |
-| `PedidoCriado` | pedidos | estoque: tenta reservar |
-| `EstoqueReservado` | estoque | pagamentos: tenta cobrar |
-| `EstoqueIndisponivel` | estoque | pedidos: cancela |
-| `PagamentoAprovado` | pagamentos | pedidos: confirma |
-| `PagamentoRecusado` | pagamentos | pedidos: cancela · estoque: **compensa** |
+| Parece com | uma orquestra: o **maestro** diz quem toca e quando | uma dança: cada dançarino **ouve a música** e reage aos outros |
+| Na prática | um serviço central manda cada um fazer a sua parte | ninguém manda: cada serviço **escuta eventos** e reage |
 
-## O que você vai fazer
+Este é o mapa da saga que você vai construir. Ele aparece em toda etapa,
+destacando a parte em que você está:
 
-1. Iniciar uma saga e ver que ela **trava** sem o participante de pagamentos.
-2. Implementar o participante **pagamentos**.
-3. Tratar os **desfechos de falha** no serviço de pedidos.
-4. Implementar a **transação de compensação** do estoque.
-5. Rodar a saga completa e testar a resiliência a um serviço fora do ar.
+![Mapa da saga](tutorial/img/mapa-geral.svg)
+
+| Evento | Quem publica | Quem reage |
+| --- | --- | --- |
+| `PedidoCriado` | pedidos | estoque tenta reservar |
+| `EstoqueReservado` | estoque | pagamentos tenta cobrar |
+| `EstoqueIndisponivel` | estoque | pedidos cancela |
+| `PagamentoAprovado` | pagamentos | pedidos confirma |
+| `PagamentoRecusado` | pagamentos | pedidos cancela **e** estoque **compensa** |
+
+## As ferramentas
+
+| Peça | O que é | Papel aqui |
+| --- | --- | --- |
+| **Docker Compose** | sobe vários containers com um único comando, a partir do `docker-compose.yml` | liga os 4 containers |
+| **Flask** | microframework web em Python | faz a API HTTP de cada serviço |
+| **Arquivo JSON** | um arquivo em um volume Docker separado para cada serviço | o **banco próprio** de cada serviço |
+| **Redis** | banco em memória, muito rápido. Tem os *Streams*: listas de mensagens que só crescem, sempre em ordem | **barramento de eventos**: todas as setas do mapa passam por ele |
+| **curl** | faz requisições HTTP pelo terminal | é o "cliente" que você vai usar |
 
 ## Como funciona este tutorial
 
-- Blocos de comando têm um botão **▶ Executar**, que roda o comando no terminal integrado.
-- Etapas com avaliação têm o botão **Verificar**. Se algo falhar, leia a saída:
-  ela diz o que está faltando.
-- Os arquivos que você vai editar abrem sozinhos, na linha do `TODO`.
+- **▶ Executar**, embaixo de um bloco de comando, roda o comando no terminal.
+- **Verificar** confere o seu código e diz o que falta quando algo dá errado.
+- O arquivo a editar abre sozinho, ao lado. Procure o marcador **✏️**.
+- Os serviços recarregam sozinhos quando você **salva** um arquivo (`Ctrl+S`).
 
 ## Preparando o ambiente
 
-Ao abrir esta introdução, o terminal já começou a subir os containers. Se
-precisar rodar de novo:
+Ao abrir esta tela, o terminal já começou a rodar:
 
 ```bash
 docker compose up -d --build --wait
 ```
 
+- `up`: cria e liga os containers descritos no `docker-compose.yml`;
+- `-d`: roda em segundo plano e devolve o terminal para você;
+- `--build`: constrói a imagem dos serviços Python antes de subir;
+- `--wait`: só termina quando todos os serviços estiverem **saudáveis**
+  (respondendo). Assim você não começa com o ambiente pela metade.
+
+Na primeira vez demora 1 ou 2 minutos, porque as imagens são baixadas. Quando o
+terminal voltar ao prompt, clique em **Começar**.
+
 > Pré-requisitos: Docker com Docker Compose e Python 3 (usado pelas
-> verificações). No GitHub Codespaces, tudo já vem instalado.
+> verificações). No GitHub Codespaces já vem tudo instalado.
