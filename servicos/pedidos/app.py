@@ -3,6 +3,7 @@
 Rotas:
   POST /pedidos  {"cliente", "produto", "quantidade"} -> cria pedido PENDENTE
   GET  /pedidos                    -> todos os pedidos
+  GET  /pedidos/resumo             -> todos os pedidos, uma linha cada (texto)
   GET  /pedidos/<id>               -> um pedido
   GET  /pedidos/<id>/historico     -> linha do tempo da saga deste pedido (texto)
   GET  /saude
@@ -37,6 +38,13 @@ def listar_pedidos():
     return jsonify(list(servico.estado["pedidos"].values()))
 
 
+@app.get("/pedidos/resumo")
+def resumo_dos_pedidos():
+    linhas = [f"{p['pedido_id']:<16} {p['produto']} x{p['quantidade']:<4} {p['status']:<11} {p['motivo'] or ''}"
+              for p in servico.estado["pedidos"].values()]
+    return "\n".join(linhas or ["(nenhum pedido ainda)"]) + "\n", 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.get("/pedidos/<pedido_id>")
 def obter_pedido(pedido_id: str):
     pedido = servico.estado["pedidos"].get(pedido_id)
@@ -51,7 +59,7 @@ def historico(pedido_id: str):
     if not eventos:
         return f"Nenhum evento para o pedido '{pedido_id}'.\n", 404, {"Content-Type": "text/plain; charset=utf-8"}
     inicio = eventos[0]["publicado_em_ms"]
-    linhas = [f"+{e['publicado_em_ms'] - inicio:>5} ms  {e['origem']:<10} publicou  {e['tipo']}" for e in eventos]
+    linhas = [f"+{(e['publicado_em_ms'] - inicio) / 1000:6.1f} s   {e['origem']:<10} publicou  {e['tipo']}" for e in eventos]
     return "\n".join(linhas) + "\n", 200, {"Content-Type": "text/plain; charset=utf-8"}
 
 

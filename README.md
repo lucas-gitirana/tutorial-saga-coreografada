@@ -6,7 +6,7 @@ com o seu banco, cooperam numa compra por meio de eventos, sem orquestrador
 central. Quando o pagamento falha, uma transação de compensação desfaz a
 reserva de estoque.
 
-**Duração estimada:** 40 minutos · 5 etapas com avaliação automática.
+10 etapas curtas, todas com avaliação automática.
 
 ## Como começar
 
@@ -46,6 +46,7 @@ servicos/
   comum/                   infraestrutura compartilhada (barramento Redis Streams)
 tutorial/
   *.md                     texto de cada etapa
+  img/                     diagramas "você está aqui" (gerados por gerar_mapas.py)
   verificar-etapa-NN.sh    avaliação automática de cada etapa
   verificacoes/            checagens em Python (só biblioteca padrão)
 ```
@@ -55,8 +56,8 @@ tutorial/
 | Sintoma | O que fazer |
 | --- | --- |
 | `Connection refused` nas verificações | `docker compose up -d --build --wait` e confira `docker compose ps` |
-| Alterei o código e nada mudou | reinicie o serviço: `docker compose restart <servico>` |
-| Pedido parado em `PENDENTE` | veja a linha do tempo: `curl localhost:8031/pedidos/<id>/historico` e os logs: `docker compose logs <servico>` |
+| Alterei o código e nada mudou | salve o arquivo (`Ctrl+S`): os serviços recarregam sozinhos. Se não voltar, veja `docker compose logs <servico> --tail 20` |
+| Pedido parado em `PENDENTE` | veja a linha do tempo (`curl localhost:8031/pedidos/<id>/historico`) e os logs (`docker compose logs <servico> --tail 20`): o evento fica pendente até o tratador ser escrito e salvo |
 | Quero recomeçar do zero | `docker compose down -v && docker compose up -d --build --wait` |
 
 O código completo de referência fica na branch **`solucao`**.

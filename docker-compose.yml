@@ -16,8 +16,9 @@ services:
 
   pedidos:
     build: ./servicos
+    restart: unless-stopped   # se um erro de digitação derrubar o serviço, ele volta assim que você corrigir
     volumes:
-      - ./servicos/pedidos:/app      # código montado: basta reiniciar o container
+      - ./servicos/pedidos:/app      # código montado: ao salvar, o serviço recarrega
       - ./servicos/comum:/comum
       - dados-pedidos:/dados         # banco de dados PRÓPRIO do serviço
     environment:
@@ -37,8 +38,9 @@ services:
 
   estoque:
     build: ./servicos
+    restart: unless-stopped
     volumes:
-      - ./servicos/estoque:/app      # código montado: basta reiniciar o container
+      - ./servicos/estoque:/app      # código montado: ao salvar, o serviço recarrega
       - ./servicos/comum:/comum
       - dados-estoque:/dados         # banco de dados PRÓPRIO do serviço
     environment:
@@ -58,8 +60,9 @@ services:
 
   pagamentos:
     build: ./servicos
+    restart: unless-stopped
     volumes:
-      - ./servicos/pagamentos:/app      # código montado: basta reiniciar o container
+      - ./servicos/pagamentos:/app      # código montado: ao salvar, o serviço recarrega
       - ./servicos/comum:/comum
       - dados-pagamentos:/dados         # banco de dados PRÓPRIO do serviço
     environment:

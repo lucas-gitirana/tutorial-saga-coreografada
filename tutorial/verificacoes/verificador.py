@@ -41,6 +41,12 @@ def executar(parar_na_primeira_falha: bool = False) -> None:
         except NotImplementedError as erro:
             falhas += 1
             print(f"✘ {descricao}\n    → ainda não implementado: {erro}")
+        except NameError as erro:
+            falhas += 1
+            if "'___'" in str(erro):
+                print(f"✘ {descricao}\n    → ainda há um ___ no código. Troque cada ___ pelo valor certo.")
+            else:
+                print(f"✘ {descricao}\n    → erro inesperado: NameError: {erro} (nome digitado errado?)")
         except Exception as erro:  # noqa: BLE001 - queremos mostrar qualquer erro ao aluno
             falhas += 1
             print(f"✘ {descricao}\n    → erro inesperado: {type(erro).__name__}: {erro}")
@@ -62,7 +68,12 @@ def importar(pasta_servico: str, modulo: str):
     caminho = str(RAIZ / pasta_servico)
     if caminho not in sys.path:
         sys.path.insert(0, caminho)
-    return importlib.import_module(modulo)
+    try:
+        return importlib.import_module(modulo)
+    except SyntaxError as erro:  # inclui IndentationError
+        print(f"✘ {pasta_servico}/{modulo}.py tem um erro de digitação na linha {erro.lineno}: {erro.msg}\n"
+              "    → Confira a indentação (4 espaços, alinhado com as linhas de cima), os parênteses e as aspas.")
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------

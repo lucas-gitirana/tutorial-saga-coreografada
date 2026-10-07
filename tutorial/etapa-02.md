@@ -1,55 +1,46 @@
-# Etapa 2 — O participante de pagamentos
+![Mapa: início da saga](tutorial/img/mapa-inicio.svg)
 
-**Objetivo:** implementar a transação local do serviço de pagamentos.
+📍 **Você está aqui:** começando uma saga. Você faz o pedido; o `pedidos` e o
+`estoque` reagem.
 
-O arquivo `servicos/pagamentos/pagamentos.py` foi aberto ao lado. Para
-entender o formato, olhe antes o exemplo pronto em
-`servicos/estoque/estoque.py`, na função `ao_pedido_criado`.
+## 1. A requisição
 
-## Como é um tratador de evento
+A cliente `ana` tem R$ 1000 e quer **2 teclados** (R$ 150 cada):
 
-```python
-def ao_estoque_reservado(estado: dict, dados: dict) -> list:
-    # estado -> o "banco de dados" do serviço (um dicionário)
-    # dados  -> o conteúdo do evento recebido
-    # retorno -> lista de eventos a publicar
+**`POST http://localhost:8031/pedidos`**
+
+```json
+{ "cliente": "ana", "produto": "teclado", "quantidade": 2 }
 ```
 
-O tratador **não sabe** quem vai reagir aos eventos que publica. Essa é a
-essência da coreografia: cada serviço conhece só os eventos, não os outros serviços.
+## 2. Envie
 
-## O que implementar em `ao_estoque_reservado`
+```bash
+curl -s -X POST localhost:8031/pedidos \
+  -H 'Content-Type: application/json' \
+  -d '{"cliente": "ana", "produto": "teclado", "quantidade": 2}' \
+  -w '← HTTP %{http_code}\n'
+```
 
-| Situação | O que fazer |
+## 3. Olhe a resposta
+
+```text
+{
+  "pedido_id": "ana-1",
+  "cliente": "ana",
+  "produto": "teclado",
+  "quantidade": 2,
+  "valor_total": 300.0,
+  "status": "PENDENTE",
+  "motivo": null
+}
+← HTTP 202
+```
+
+| Repare em | O que significa |
 | --- | --- |
-| `pedido_id` já está em `estado["pagamentos"]` | devolver `[]` (já processado) |
-| saldo `<` valor | registrar o pagamento como `RECUSADO` e devolver `PagamentoRecusado` com um `motivo` |
-| caso contrário | debitar o saldo, registrar como `APROVADO` e devolver `PagamentoAprovado` |
+| **202 Accepted** | "recebi, mas ainda não terminei". Não é 201 (Created) porque o resultado depende de **outros serviços** |
+| `"status": "PENDENTE"` | o pedido está esperando o resto da saga |
+| `"pedido_id": "ana-1"` | o **id de correlação**: todo evento desta saga vai carregar esse id. É com ele que cada serviço sabe de qual pedido o evento fala |
 
-> **Por que verificar se já foi processado?** Sistemas de mensageria
-> garantem entrega **pelo menos uma vez**: o mesmo evento pode chegar duas
-> vezes (ex.: o serviço caiu antes de confirmar o recebimento). Um
-> participante de saga precisa ser **idempotente**, ou cobraria o cliente em dobro.
-
-## Teste no serviço
-
-Reinicie o serviço. Ao subir, ele **reprocessa o evento pendente** da Etapa 1:
-
-```bash
-docker compose restart pagamentos && sleep 3
-docker compose logs pagamentos --tail 5
-```
-
-A saga da `ana` continuou de onde parou:
-
-```bash
-PEDIDO_ANA=$(python3 -c 'import json; print(json.load(open("/tmp/pedido-ana.json"))["pedido_id"])')
-curl -s localhost:8031/pedidos/$PEDIDO_ANA/historico
-curl -s -w '\n' localhost:8031/pedidos/$PEDIDO_ANA
-curl -s -w '\n' localhost:8033/carteiras
-```
-
-O pedido está `CONFIRMADO` e o saldo da `ana` caiu para R$ 700,00. O serviço
-de pedidos já sabia tratar `PagamentoAprovado` (é o exemplo em `pedidos.py`).
-
-Clique em **Verificar**. A verificação testa `pagamentos.py` diretamente.
+## 4. Clique em Verificar ✔

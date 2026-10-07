@@ -1,53 +1,52 @@
-# Etapa 3 — Quando a saga dá errado
+![Mapa: início da saga](tutorial/img/mapa-inicio.svg)
 
-**Objetivo:** fazer o serviço de pedidos reagir aos eventos de falha.
+📍 **Você está aqui:** seguindo o pedido `ana-1` pelo mapa. Ele vai parar no
+meio do caminho.
 
-Uma saga tem **vários desfechos possíveis**. O serviço de pedidos já trata o
-caminho feliz (`ao_pagamento_aprovado`). Faltam os dois caminhos de falha, em
-`servicos/pedidos/pedidos.py`:
+## 1. Veja a linha do tempo da saga
 
-| Evento recebido | Novo status | `motivo` | Evento publicado |
-| --- | --- | --- | --- |
-| `EstoqueIndisponivel` | `CANCELADO` | `"estoque indisponível"` | `PedidoCancelado` |
-| `PagamentoRecusado` | `CANCELADO` | `dados["motivo"]` | `PedidoCancelado` |
-
-Siga o exemplo de `ao_pagamento_aprovado`. A função auxiliar `_pedido_pendente`
-já cuida da idempotência: só deixa passar pedidos que ainda estão `PENDENTE`.
-
-## Teste no serviço
+**`GET http://localhost:8031/pedidos/ana-1/historico`**
 
 ```bash
-docker compose restart pedidos && sleep 3
+curl -s localhost:8031/pedidos/ana-1/historico
 ```
 
-**Falta de estoque.** Há só 2 monitores; a `carla` pede 5:
+```text
++   0.0 s   pedidos    publicou  PedidoCriado
++   0.0 s   estoque    publicou  EstoqueReservado
+```
+
+Ninguém **mandou** o estoque reservar: ele **ouviu** o `PedidoCriado` e
+reagiu. Isso é **coreografia**.
+
+Depois disso... silêncio. O pedido continua `PENDENTE`.
+
+## 2. Descubra onde travou
 
 ```bash
-curl -s -w '\n' -X POST localhost:8031/pedidos -H 'Content-Type: application/json' \
-  -d '{"cliente": "carla", "produto": "monitor", "quantidade": 5}' | tee /tmp/pedido-carla.json
-sleep 1
-curl -s -w '\n' localhost:8031/pedidos/$(python3 -c 'import json; print(json.load(open("/tmp/pedido-carla.json"))["pedido_id"])')
+docker compose logs --no-log-prefix pagamentos --tail 3
 ```
 
-**Saldo insuficiente.** O `bruno` tem R$ 100,00 e pede um monitor de R$ 900,00:
+```text
+[pagamentos] ← recebeu EstoqueReservado (pedido ana-1)
+[pagamentos] ⚠ EstoqueReservado NÃO tratado: ao_estoque_reservado ainda não devolve nada ...
+```
+
+O `pagamentos` recebeu o evento, mas o código de cobrança **ainda não existe**.
+Quem vai escrever é você, na próxima etapa.
+
+## 3. O evento não se perdeu
+
+Um serviço só **confirma** ao Redis que tratou um evento depois de tratá-lo.
+Sem confirmação, o evento fica guardado como **pendente**:
 
 ```bash
-curl -s -w '\n' -X POST localhost:8031/pedidos -H 'Content-Type: application/json' \
-  -d '{"cliente": "bruno", "produto": "monitor", "quantidade": 1}' | tee /tmp/pedido-bruno.json
-sleep 1
-PEDIDO_BRUNO=$(python3 -c 'import json; print(json.load(open("/tmp/pedido-bruno.json"))["pedido_id"])')
-curl -s localhost:8031/pedidos/$PEDIDO_BRUNO/historico
-curl -s -w '\n' localhost:8031/pedidos/$PEDIDO_BRUNO
+docker compose exec redis redis-cli XPENDING saga.eventos pagamentos
 ```
 
-O pedido do bruno foi `CANCELADO`. Agora olhe o estoque:
+O primeiro número da saída é a quantidade de eventos pendentes do `pagamentos`: **1**.
 
-```bash
-curl -s -w '\n' localhost:8032/estoque
-```
+Quando você escrever o código e **salvar**, o `pagamentos` reinicia, pega esse
+evento de novo e a saga da `ana` **continua de onde parou**.
 
-Há um problema: **1 monitor continua reservado** para um pedido cancelado. O
-estoque reservou o produto antes de o pagamento falhar, e ninguém desfez a
-reserva. O sistema está **inconsistente**. A próxima etapa resolve isso.
-
-Clique em **Verificar**. A verificação testa `pedidos.py` diretamente.
+## 4. Clique em Verificar ✔
