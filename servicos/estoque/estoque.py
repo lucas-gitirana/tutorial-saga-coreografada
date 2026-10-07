@@ -15,6 +15,7 @@ ESTADO_INICIAL = {
 
 
 def evento(tipo: str, **dados) -> dict:
+    """evento("X", a=1) devolve {"tipo": "X", "dados": {"a": 1}}."""
     return {"tipo": tipo, "dados": dados}
 
 
@@ -41,15 +42,18 @@ def ao_pedido_criado(estado: dict, dados: dict) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Etapa 4: a transação de COMPENSAÇÃO
+# Etapa 9: a transação de COMPENSAÇÃO
 # ---------------------------------------------------------------------------
 def ao_pagamento_recusado(estado: dict, dados: dict) -> list:
-    # TODO (Etapa 4): desfaça a reserva feita em ao_pedido_criado.
-    #   1. Busque a reserva pelo id de correlação: estado["reservas"].get(dados["pedido_id"])
-    #   2. Se não existe ou o status não é "RESERVADA", devolva [] (nada a compensar).
-    #   3. Devolva a quantidade a estado["disponivel"][produto] e marque o status "LIBERADA".
-    #   4. Devolva [evento("EstoqueLiberado", pedido_id=..., produto=..., quantidade=...)]
-    raise NotImplementedError("Etapa 4: implemente ao_pagamento_recusado em servicos/estoque/estoque.py")
+    # O PagamentoRecusado NÃO diz qual produto foi reservado. Quem sabe é o
+    # próprio estoque: ele guardou a reserva pelo id de correlação (pedido_id).
+    reserva = estado["reservas"].get(dados["pedido_id"])
+    # reserva é None (pedido desconhecido) ou um dicionário como este:
+    #   {"produto": "monitor", "quantidade": 1, "status": "RESERVADA"}
+
+    # ═══ Etapa 9 · COMPENSAR: desfazer a reserva ═══════════════════════════
+    # ✏️  Escreva aqui o `if` de idempotência e as linhas que devolvem o estoque.
+
 
 
 TRATADORES = {

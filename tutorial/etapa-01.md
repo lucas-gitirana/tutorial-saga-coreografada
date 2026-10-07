@@ -1,56 +1,39 @@
-# Etapa 1 — Iniciando uma saga
+![Mapa: visão geral](tutorial/img/mapa-geral.svg)
 
-**Objetivo:** criar um pedido e acompanhar os eventos da saga.
+📍 **Você está aqui:** conhecendo as peças do mapa.
 
-## 1. Confira os serviços
+## 1. Veja os containers
 
 ```bash
 docker compose ps
 ```
 
-São quatro containers: `redis`, `pedidos`, `estoque` e `pagamentos`. Cada
-serviço tem **o seu próprio volume de dados**. Ninguém lê o banco do outro.
+Devem aparecer **4 containers** com estado `running (healthy)`:
 
-## 2. Faça um pedido
+| Container | No mapa |
+| --- | --- |
+| `pedidos` | começa a saga e guarda o desfecho (porta 8031) |
+| `estoque` | reserva os produtos (porta 8032) |
+| `pagamentos` | cobra o cliente (porta 8033) |
+| `redis` | por onde passam **todas as setas** (os eventos) |
 
-A cliente `ana` tem R$ 1000,00 na carteira. Ela vai comprar 2 teclados
-(R$ 150,00 cada):
+O `docker-compose.yml`, aberto ao lado, descreve esses quatro containers.
 
-```bash
-curl -s -w '\n' -X POST localhost:8031/pedidos -H 'Content-Type: application/json' \
-  -d '{"cliente": "ana", "produto": "teclado", "quantidade": 2}' | tee /tmp/pedido-ana.json
-```
+## 2. Espie os bancos
 
-A resposta é **HTTP 202 Accepted**, com status `PENDENTE`. O pedido foi
-aceito, mas o desfecho depende dos outros serviços.
-
-## 3. Acompanhe a saga
-
-Guarde o id e veja a **linha do tempo** dos eventos desse pedido:
+Cada serviço tem o **seu** banco, e nenhum lê o banco do outro. Veja o do
+estoque e o de pagamentos:
 
 ```bash
-PEDIDO_ANA=$(python3 -c 'import json; print(json.load(open("/tmp/pedido-ana.json"))["pedido_id"])')
-curl -s localhost:8031/pedidos/$PEDIDO_ANA/historico
-curl -s -w '\n' localhost:8031/pedidos/$PEDIDO_ANA
+curl -s localhost:8032/estoque
+curl -s localhost:8033/carteiras
 ```
 
-O estoque reagiu ao `PedidoCriado` e publicou `EstoqueReservado`... e a saga
-parou. O pedido continua `PENDENTE`.
+Guarde dois números, eles vão importar: há só **2 monitores** no estoque, e o
+**bruno** tem só **R$ 100** na carteira.
 
-## 4. Descubra por quê
+> Algum container não está `healthy`? Rode `docker compose up -d --build --wait` de novo.
 
-```bash
-docker compose logs pagamentos
-```
+## 3. Clique em Verificar ✔
 
-O serviço de pagamentos recebeu o `EstoqueReservado`, mas não sabe tratá-lo
-(é a sua tarefa da Etapa 2). Repare na mensagem: o evento **ficou pendente**
-no Redis e será reprocessado quando o serviço reiniciar. Ele não se perdeu.
-
-Veja também que o estoque já está reservado:
-
-```bash
-curl -s -w '\n' localhost:8032/estoque
-```
-
-Clique em **Verificar** para concluir a etapa.
+A verificação confere se os três serviços estão respondendo.

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1030 310" width="100%" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<rect x="1" y="1" width="1028" height="308" rx="10" fill="#ffffff" stroke="#dee2e6"/>
+<text x="515" y="26" text-anchor="middle" font-size="13" fill="#868e96">Cada seta é um evento no Redis (stream saga.eventos). Nenhum serviço chama o outro.</text>
+<polyline points="107,150 150.0,150.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="158,150 147.0,156.0 147.0,144.0" fill="#adb5bd"/>
+<text x="132" y="140" text-anchor="middle" font-size="12" fill="#adb5bd" font-weight="400">POST</text>
+<polyline points="322,135 470.0,135.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="478,135 467.0,141.0 467.0,129.0" fill="#adb5bd"/>
+<text x="400" y="125" text-anchor="middle" font-size="12" fill="#adb5bd" font-weight="400">PedidoCriado</text>
+<polyline points="642,135 790.0,135.0" fill="none" stroke="#d9480f" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="798,135 784.8,142.2 784.8,127.8" fill="#d9480f"/>
+<text x="720" y="125" text-anchor="middle" font-size="12" fill="#d9480f" font-weight="600">EstoqueReservado</text>
+<polyline points="478,167 330.0,167.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="322,167 333.0,161.0 333.0,173.0" fill="#adb5bd"/>
+<text x="400" y="183" text-anchor="middle" font-size="12" fill="#adb5bd" font-weight="400">EstoqueIndisponivel</text>
+<polyline points="798,167 650.0,167.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="642,167 653.0,161.0 653.0,173.0" fill="#adb5bd"/>
+<text x="720" y="183" text-anchor="middle" font-size="12" fill="#adb5bd" font-weight="400">PagamentoRecusado</text>
+<polyline points="880,113 880,72 240,72 240.0,105.0" fill="none" stroke="#2f9e44" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="240,113 232.8,99.8 247.2,99.8" fill="#2f9e44"/>
+<text x="560" y="64" text-anchor="middle" font-size="12" fill="#2f9e44" font-weight="600">PagamentoAprovado  ou  PagamentoRecusado</text>
+<polyline points="240,187 240.0,235.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="240,243 234.0,232.0 246.0,232.0" fill="#adb5bd"/>
+<text x="248" y="219" text-anchor="start" font-size="12" fill="#adb5bd" font-weight="400">grava</text>
+<polyline points="560,187 560.0,235.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="560,243 554.0,232.0 566.0,232.0" fill="#adb5bd"/>
+<text x="568" y="219" text-anchor="start" font-size="12" fill="#adb5bd" font-weight="400">grava</text>
+<polyline points="880,187 880.0,235.0" fill="none" stroke="#2f9e44" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="880,243 872.8,229.8 887.2,229.8" fill="#2f9e44"/>
+<text x="888" y="219" text-anchor="start" font-size="12" fill="#2f9e44" font-weight="600">grava</text>
+<rect x="15" y="123" width="90" height="54" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="1.5"/>
+<text x="60.0" y="147.0" text-anchor="middle" font-size="14" font-weight="700" fill="#adb5bd">Você</text>
+<text x="60.0" y="164.0" text-anchor="middle" font-size="12" fill="#adb5bd">(curl)</text>
+<rect x="160" y="115" width="160" height="70" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="1.5"/>
+<text x="240.0" y="147.0" text-anchor="middle" font-size="14" font-weight="700" fill="#adb5bd">pedidos</text>
+<text x="240.0" y="164.0" text-anchor="middle" font-size="12" fill="#adb5bd">porta 8031</text>
+<rect x="480" y="115" width="160" height="70" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="1.5"/>
+<text x="560.0" y="147.0" text-anchor="middle" font-size="14" font-weight="700" fill="#adb5bd">estoque</text>
+<text x="560.0" y="164.0" text-anchor="middle" font-size="12" fill="#adb5bd">porta 8032</text>
+<rect x="800" y="115" width="160" height="70" rx="8" fill="#ebfbee" stroke="#2f9e44" stroke-width="2.5"/>
+<text x="880.0" y="147.0" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">pagamentos</text>
+<text x="880.0" y="164.0" text-anchor="middle" font-size="12" fill="#495057">porta 8033</text>
+<rect x="165" y="245" width="150" height="50" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="240.0" y="267.0" text-anchor="middle" font-size="14" font-weight="700" fill="#adb5bd">pedidos.json</text>
+<text x="240.0" y="284.0" text-anchor="middle" font-size="12" fill="#adb5bd">banco próprio</text>
+<rect x="485" y="245" width="150" height="50" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="1.5" stroke-dasharray="5 3"/>
+<text x="560.0" y="267.0" text-anchor="middle" font-size="14" font-weight="700" fill="#adb5bd">estoque.json</text>
+<text x="560.0" y="284.0" text-anchor="middle" font-size="12" fill="#adb5bd">banco próprio</text>
+<rect x="805" y="245" width="150" height="50" rx="8" fill="#ebfbee" stroke="#2f9e44" stroke-width="2.5" stroke-dasharray="5 3"/>
+<text x="880.0" y="267.0" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">pagamentos.json</text>
+<text x="880.0" y="284.0" text-anchor="middle" font-size="12" fill="#495057">banco próprio</text>
+</svg>

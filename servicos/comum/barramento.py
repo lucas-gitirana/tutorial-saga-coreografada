@@ -6,7 +6,8 @@ uma vez cada. Depois de tratar um evento, o serviço o confirma (XACK).
 
 Se o tratamento falhar (por exemplo, um tratador ainda não implementado), o
 evento NÃO é confirmado: fica pendente e é reprocessado quando o serviço
-reiniciar. Assim, nenhuma etapa da saga se perde.
+reiniciar, o que acontece sozinho sempre que você salva o código. Assim,
+nenhuma etapa da saga se perde.
 
 Este arquivo é infraestrutura: você não precisa alterá-lo no tutorial.
 """
@@ -28,10 +29,10 @@ class Barramento:
         self.stream = stream
         self.redis = redis.Redis.from_url(url, decode_responses=True)
 
-    def publicar(self, evento: dict) -> str:
+    def publicar(self, evento: dict, origem: str | None = None) -> str:
         return self.redis.xadd(self.stream, {
             "tipo": evento["tipo"],
-            "origem": self.servico,
+            "origem": origem or self.servico,
             "dados": json.dumps(evento["dados"], ensure_ascii=False),
         })
 
@@ -87,11 +88,11 @@ class Barramento:
             ao_receber(evento)
         except NotImplementedError as erro:
             print(f"[{self.servico}] ⚠ {evento['tipo']} NÃO tratado: {erro}. "
-                  "O evento ficou pendente e será reprocessado quando o serviço reiniciar.")
+                  "O evento ficou PENDENTE e será reprocessado quando você salvar o código.")
             return
         except Exception as erro:  # noqa: BLE001 - não derruba o consumidor
             print(f"[{self.servico}] ⚠ erro ao tratar {evento['tipo']}: {type(erro).__name__}: {erro}. "
-                  "O evento ficou pendente e será reprocessado quando o serviço reiniciar.")
+                  "O evento ficou PENDENTE e será reprocessado quando você salvar o código.")
             return
         self.redis.xack(self.stream, self.servico, id_mensagem)
 

@@ -1,52 +1,79 @@
-# Etapa 5 — A saga completa
+![Mapa: pagamentos](tutorial/img/mapa-pagamentos.svg)
 
-**Objetivo:** ver todos os caminhos da saga funcionando e testar a resiliência
-da comunicação assíncrona.
+📍 **Você está aqui:** no mesmo tratador do `pagamentos`. Agora, o caso em que
+o saldo **não dá**.
 
-## 1. Os três desfechos
+## O que deve acontecer
 
-```bash
-for pedido in '{"cliente": "carla", "produto": "mouse", "quantidade": 3}' \
-              '{"cliente": "bruno", "produto": "teclado", "quantidade": 1}' \
-              '{"cliente": "carla", "produto": "monitor", "quantidade": 10}'; do
-  curl -s -X POST localhost:8031/pedidos -H 'Content-Type: application/json' -d "$pedido" > /dev/null
-done
-sleep 1
-curl -s localhost:8031/pedidos | python3 -c '
-import sys, json
-for p in json.load(sys.stdin):
-    print(p["pedido_id"], p["cliente"].ljust(6), p["produto"].ljust(8), p["status"].ljust(11), p["motivo"] or "")'
+| Situação | No banco do `pagamentos` | Evento publicado |
+| --- | --- | --- |
+| saldo **suficiente** | debita e registra `APROVADO` *(Etapa 4)* | `PagamentoAprovado` |
+| saldo **insuficiente** | registra `RECUSADO`; o saldo **não muda** | `PagamentoRecusado`, com um `motivo` |
+
+## 🐍 Python rápido: `return` antecipado
+
+`return` termina a função **na hora**. Por isso o `if` da recusa fica **acima**
+do código da Etapa 4: quem não tem saldo sai da função antes de ser cobrado.
+
+```python
+if saldo < valor:
+    ...
+    return [...]      # sem saldo: a função termina aqui
+# só chega aqui quem tem saldo
 ```
 
-## 2. Um serviço fora do ar
+## ✏️ Faça
 
-O que acontece se o serviço de pagamentos cair no meio da saga?
+Abaixo do marcador **Etapa 5** (acima do que você escreveu na Etapa 4),
+escreva o `if` e complete os `___`:
 
-```bash
-docker compose stop pagamentos
-curl -s -w '\n' -X POST localhost:8031/pedidos -H 'Content-Type: application/json' \
-  -d '{"cliente": "carla", "produto": "teclado", "quantidade": 1}' | tee /tmp/pedido-resiliencia.json
-sleep 2
-curl -s -w '\n' localhost:8031/pedidos/$(python3 -c 'import json; print(json.load(open("/tmp/pedido-resiliencia.json"))["pedido_id"])')
+```python
+    if saldo < valor:
+        estado["pagamentos"][pedido_id] = {"cliente": cliente, "valor": valor, "status": ___}
+        return [evento("PagamentoRecusado", pedido_id=pedido_id, cliente=cliente, valor_total=valor,
+                       motivo=___)]
 ```
 
-O pedido fica `PENDENTE`, mas **nada quebra**: o pedidos e o estoque fizeram
-a sua parte e seguem respondendo. Agora suba o pagamentos de novo:
+> Dica: o status é `"RECUSADO"` e o motivo pode ser `"saldo insuficiente"`.
 
-```bash
-docker compose start pagamentos && sleep 3
-curl -s -w '\n' localhost:8031/pedidos/$(python3 -c 'import json; print(json.load(open("/tmp/pedido-resiliencia.json"))["pedido_id"])')
+**Salve** (`Ctrl+S`).
+
+## 🧪 Teste: o `bruno` tenta comprar um monitor
+
+O `bruno` tem R$ 100 e o monitor custa R$ 900:
+
+**`POST http://localhost:8031/pedidos`**
+
+```json
+{ "cliente": "bruno", "produto": "monitor", "quantidade": 1 }
 ```
 
-O evento esperou no Redis e a saga terminou sozinha (`CONFIRMADO`). Esse
-**desacoplamento temporal** é uma vantagem da comunicação por eventos. Numa
-cadeia de chamadas HTTP síncronas, o pedido teria falhado na hora.
-
-## 3. Os logs de cada participante
-
 ```bash
-docker compose logs --no-log-prefix estoque | tail -8
+curl -s -X POST localhost:8031/pedidos \
+  -H 'Content-Type: application/json' \
+  -d '{"cliente": "bruno", "produto": "monitor", "quantidade": 1}' \
+  -w '← HTTP %{http_code}\n'
 ```
 
-Clique em **Verificar**. A verificação roda os três desfechos de ponta a ponta
-com clientes novos e confere estoque, saldos e a linha do tempo da saga.
+Veja a linha do tempo do pedido `bruno-1`:
+
+```bash
+curl -s localhost:8031/pedidos/bruno-1/historico
+```
+
+```text
++   0.0 s   pedidos    publicou  PedidoCriado
++   0.0 s   estoque    publicou  EstoqueReservado
++   0.0 s   pagamentos publicou  PagamentoRecusado
+```
+
+🤔 O pagamento foi recusado... mas o pedido continua `PENDENTE`:
+
+```bash
+curl -s localhost:8031/pedidos/bruno-1
+```
+
+O `pedidos` ainda não sabe reagir ao `PagamentoRecusado`. Guarde o `bruno-1`:
+ele volta na Etapa 8.
+
+## Clique em Verificar ✔

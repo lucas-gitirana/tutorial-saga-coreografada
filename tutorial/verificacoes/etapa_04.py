@@ -1,56 +1,54 @@
-"""Etapa 4: compensação no estoque (testado sem subir containers)."""
+"""Etapa 4: pagamentos, saldo suficiente (cobrar e aprovar)."""
 import copy
 
+import saga
 from verificador import executar, importar, verificacao
 
-estoque = importar("servicos/estoque", "estoque")
+pagamentos = importar("servicos/pagamentos", "pagamentos")
 
-CRIADO = {"pedido_id": "p1", "cliente": "ana", "produto": "teclado", "quantidade": 3, "valor_total": 450.0}
-RECUSADO = {"pedido_id": "p1", "cliente": "ana", "valor_total": 450.0, "motivo": "saldo insuficiente"}
-
-
-def reservado():
-    estado = copy.deepcopy(estoque.ESTADO_INICIAL)
-    estado["disponivel"]["teclado"] = 10
-    estoque.ao_pedido_criado(estado, dict(CRIADO))
-    assert estado["disponivel"]["teclado"] == 7, "pré-requisito: a reserva de exemplo deveria deixar 7 teclados."
-    return estado
+RESERVADO = {"pedido_id": "p1", "cliente": "ana", "produto": "teclado", "quantidade": 2, "valor_total": 300.0}
 
 
-@verificacao("PagamentoRecusado devolve ao estoque a quantidade reservada")
-def devolve():
-    estado = reservado()
-    estoque.ao_pagamento_recusado(estado, dict(RECUSADO))
-    assert estado["disponivel"]["teclado"] == 10, (
-        f"esperado 10 teclados disponíveis após a compensação, há {estado['disponivel']['teclado']}."
+@verificacao("saldo suficiente: debita o valor (ana: 1000 → 700)")
+def debita():
+    estado = copy.deepcopy(pagamentos.ESTADO_INICIAL)
+    pagamentos.ao_estoque_reservado(estado, dict(RESERVADO))
+    assert estado["saldos"]["ana"] == 700.0, (
+        f"o saldo da ana deveria ir de 1000 para 700, está {estado['saldos']['ana']}. "
+        "Confira a linha estado[\"saldos\"][cliente] = saldo - valor."
     )
 
 
-@verificacao("a reserva é marcada como LIBERADA e o evento EstoqueLiberado é publicado")
-def libera():
-    estado = reservado()
-    eventos = estoque.ao_pagamento_recusado(estado, dict(RECUSADO)) or []
-    assert estado["reservas"]["p1"]["status"] == "LIBERADA", f"status da reserva: {estado['reservas']['p1']['status']!r}."
-    assert [e.get("tipo") for e in eventos] == ["EstoqueLiberado"], f"eventos publicados: {[e.get('tipo') for e in eventos]}."
+@verificacao("registra o pagamento como APROVADO em estado['pagamentos']")
+def registra():
+    estado = copy.deepcopy(pagamentos.ESTADO_INICIAL)
+    pagamentos.ao_estoque_reservado(estado, dict(RESERVADO))
+    registro = estado["pagamentos"].get("p1")
+    assert registro, "estado['pagamentos']['p1'] não foi criado."
+    assert registro.get("status") == "APROVADO", f"status do registro: {registro.get('status')!r}."
+
+
+@verificacao("devolve [PagamentoAprovado] com pedido_id, cliente e valor_total")
+def publica():
+    estado = copy.deepcopy(pagamentos.ESTADO_INICIAL)
+    eventos = pagamentos.ao_estoque_reservado(estado, dict(RESERVADO))
+    assert eventos is not None, "a função não devolveu nada. Termine com return [evento(\"PagamentoAprovado\", ...)]."
+    assert [e.get("tipo") for e in eventos] == ["PagamentoAprovado"], f"eventos devolvidos: {eventos}"
     dados = eventos[0]["dados"]
-    assert dados.get("pedido_id") == "p1" and dados.get("produto") == "teclado" and dados.get("quantidade") == 3, (
-        f"o EstoqueLiberado deveria levar pedido_id, produto e quantidade; veio {dados}."
+    esperado = {"pedido_id": "p1", "cliente": "ana", "valor_total": 300.0}
+    for campo, valor in esperado.items():
+        assert dados.get(campo) == valor, f"dados['{campo}'] deveria ser {valor!r}, veio {dados.get(campo)!r}."
+
+
+@verificacao("o pagamentos em execução já usa o seu código (um pedido novo é CONFIRMADO)")
+def ponta_a_ponta():
+    cliente = saga.cliente_novo()
+    saga.depositar(cliente, 200.0)
+    saga.repor("mouse", 1)
+    pedido = saga.aguardar_desfecho(saga.pedir(cliente, "mouse", 1))
+    assert pedido.get("status") == "CONFIRMADO", (
+        f"o pedido {pedido.get('pedido_id')} ficou {pedido.get('status')}. {saga.dica_logs('pagamentos')}"
     )
 
 
-@verificacao("idempotência: compensar duas vezes não devolve o estoque duas vezes")
-def idempotente():
-    estado = reservado()
-    estoque.ao_pagamento_recusado(estado, dict(RECUSADO))
-    segunda = estoque.ao_pagamento_recusado(estado, dict(RECUSADO))
-    assert estado["disponivel"]["teclado"] == 10, f"estoque devolvido duas vezes: {estado['disponivel']['teclado']} teclados."
-    assert not segunda, "na segunda entrega, nenhum evento deveria ser publicado."
-
-
-@verificacao("pedido sem reserva (desconhecido) é ignorado sem erro")
-def sem_reserva():
-    estado = copy.deepcopy(estoque.ESTADO_INICIAL)
-    assert not estoque.ao_pagamento_recusado(estado, dict(RECUSADO, pedido_id="nao-existe"))
-
-
-executar()
+executar(parar_na_primeira_falha=True)
