@@ -72,7 +72,7 @@ def svg(destaque: set[str]) -> str:
     ]
     partes.append('<rect x="1" y="1" width="1028" height="308" rx="10" fill="#ffffff" stroke="#dee2e6"/>')
     partes.append('<text x="515" y="26" text-anchor="middle" font-size="13" fill="#868e96">'
-                  'Cada seta é um evento no Redis (stream saga.eventos). Nenhum serviço chama o outro.</text>')
+                  'Cada seta é um evento: publicado no RabbitMQ e entregue na fila de quem assina. Nenhum serviço chama o outro.</text>')
 
     for nome, (pontos, rotulo, (tx, ty), cor) in SETAS.items():
         ligado = nome in destaque

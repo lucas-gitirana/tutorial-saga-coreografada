@@ -2,17 +2,24 @@
 #   pedidos    -> inicia a saga          (http://localhost:8031)
 #   estoque    -> reserva / libera       (http://localhost:8032)
 #   pagamentos -> cobra o cliente        (http://localhost:8033)
-#   redis      -> barramento de eventos (Redis Streams). Não há orquestrador!
+#   rabbitmq   -> barramento de eventos  (painel: http://localhost:15672, usuário e senha: guest)
+#                 Não há orquestrador!
 name: tutorial-saga-coreografada
 
 services:
-  redis:
-    image: redis:7-alpine
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    hostname: rabbitmq                # o RabbitMQ guarda os dados pelo nome do host
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-tutorial.conf:ro
+    ports:
+      - "15672:15672"                 # painel de gerenciamento (filas, exchanges, mensagens)
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 2s
-      timeout: 2s
-      retries: 15
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
 
   pedidos:
     build: ./servicos
@@ -23,7 +30,7 @@ services:
       - dados-pedidos:/dados         # banco de dados PRÓPRIO do serviço
     environment:
       PYTHONPATH: /comum
-      REDIS_URL: redis://redis:6379/0
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F
       ARQUIVO_ESTADO: /dados/pedidos.json
     ports:
       - "8031:8000"
@@ -33,7 +40,7 @@ services:
       timeout: 2s
       retries: 15
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
 
   estoque:
@@ -45,7 +52,7 @@ services:
       - dados-estoque:/dados         # banco de dados PRÓPRIO do serviço
     environment:
       PYTHONPATH: /comum
-      REDIS_URL: redis://redis:6379/0
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F
       ARQUIVO_ESTADO: /dados/estoque.json
     ports:
       - "8032:8000"
@@ -55,7 +62,7 @@ services:
       timeout: 2s
       retries: 15
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
 
   pagamentos:
@@ -67,7 +74,7 @@ services:
       - dados-pagamentos:/dados         # banco de dados PRÓPRIO do serviço
     environment:
       PYTHONPATH: /comum
-      REDIS_URL: redis://redis:6379/0
+      AMQP_URL: amqp://guest:guest@rabbitmq:5672/%2F
       ARQUIVO_ESTADO: /dados/pagamentos.json
     ports:
       - "8033:8000"
@@ -77,7 +84,7 @@ services:
       timeout: 2s
       retries: 15
     depends_on:
-      redis:
+      rabbitmq:
         condition: service_healthy
 
 volumes:

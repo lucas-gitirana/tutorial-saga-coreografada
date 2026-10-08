@@ -61,7 +61,8 @@ complete os `___`:
 
 ## 🧪 Teste: a saga da `ana` continua sozinha
 
-Ao salvar, o `pagamentos` reinicia e pega o evento que estava **pendente**.
+Ao salvar, o `pagamentos` reinicia, e o evento que estava **Unacked** volta
+para a fila e é entregue de novo.
 Espere 3 segundos e veja a linha do tempo:
 
 ```bash

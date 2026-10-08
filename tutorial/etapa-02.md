@@ -43,4 +43,27 @@ curl -s -X POST localhost:8031/pedidos \
 | `"status": "PENDENTE"` | o pedido está esperando o resto da saga |
 | `"pedido_id": "ana-1"` | o **id de correlação**: todo evento desta saga vai carregar esse id. É com ele que cada serviço sabe de qual pedido o evento fala |
 
-## 4. Clique em Verificar ✔
+## 4. Para onde foi o evento?
+
+O `pedidos` publicou o `PedidoCriado` no exchange `saga.eventos` sem saber quem
+ia receber. Veja as **assinaturas** (bindings) de cada fila:
+
+```bash
+docker compose exec rabbitmq rabbitmqctl -q list_bindings source_name destination_name routing_key | grep '^saga' | column -t
+```
+
+```text
+saga.eventos  saga.historico  #
+saga.eventos  pedidos         EstoqueIndisponivel
+saga.eventos  pagamentos      EstoqueReservado
+saga.eventos  pedidos         PagamentoAprovado
+saga.eventos  estoque         PagamentoRecusado
+saga.eventos  pedidos         PagamentoRecusado
+saga.eventos  estoque         PedidoCriado
+```
+
+Compare com a tabela **Quem reage** da introdução: é a mesma! A coreografia
+está escrita nas assinaturas. O `PedidoCriado` foi parar na fila `estoque` e
+na `saga.historico` (que assina tudo, `#`).
+
+## 5. Clique em Verificar ✔

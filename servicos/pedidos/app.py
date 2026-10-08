@@ -13,7 +13,8 @@ from flask import jsonify, request
 from participante import Participante
 from pedidos import ESTADO_INICIAL, TRATADORES, ErroDePedido, criar_pedido
 
-servico = Participante("pedidos", ESTADO_INICIAL, TRATADORES)
+# guardar_historico: o pedidos também escuta a fila "saga.historico" (assina "#", todos os eventos)
+servico = Participante("pedidos", ESTADO_INICIAL, TRATADORES, guardar_historico=True)
 app = servico.app
 
 
@@ -55,7 +56,7 @@ def obter_pedido(pedido_id: str):
 
 @app.get("/pedidos/<pedido_id>/historico")
 def historico(pedido_id: str):
-    eventos = servico.barramento.historico(lambda e: e["dados"].get("pedido_id") == pedido_id)
+    eventos = sorted(servico.historico(pedido_id), key=lambda e: e["publicado_em_ms"])
     if not eventos:
         return f"Nenhum evento para o pedido '{pedido_id}'.\n", 404, {"Content-Type": "text/plain; charset=utf-8"}
     inicio = eventos[0]["publicado_em_ms"]

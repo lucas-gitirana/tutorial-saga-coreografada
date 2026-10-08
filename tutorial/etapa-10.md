@@ -26,7 +26,14 @@ curl -s -X POST localhost:8031/pedidos \
 
 A resposta veio normalmente (`202`), com o `pedido_id` **`carla-2`**. O pedido
 fica `PENDENTE`, mas **nada quebrou**: o `pedidos` e o `estoque` fizeram a sua
-parte e continuam respondendo.
+parte e continuam respondendo. E o `EstoqueReservado`?
+
+```bash
+docker compose exec rabbitmq rabbitmqctl -q list_queues name messages_ready messages_unacknowledged | column -t
+```
+
+Ele está **esperando na fila** `pagamentos` (`messages_ready` = 1). A fila
+existe mesmo com o serviço desligado.
 
 ## 3. Suba o `pagamentos` de novo
 
@@ -36,7 +43,7 @@ sleep 2
 curl -s localhost:8031/pedidos/carla-2
 ```
 
-O pedido está `CONFIRMADO`. O `EstoqueReservado` **esperou no Redis** até o
+O pedido está `CONFIRMADO`. O `EstoqueReservado` **esperou na fila** até o
 `pagamentos` voltar, e a saga terminou sozinha.
 
 | Com chamadas HTTP diretas | Com eventos (saga coreografada) |
