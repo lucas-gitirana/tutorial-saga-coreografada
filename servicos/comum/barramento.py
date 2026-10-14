@@ -1,13 +1,21 @@
-"""Barramento de eventos sobre Redis Streams, com grupos de consumidores.
+"""Barramento de eventos sobre RabbitMQ.
 
-Todos os eventos da saga vão para um único stream (``saga.eventos``). Cada
-serviço participa como um *grupo de consumidores* e recebe todos os eventos,
-uma vez cada. Depois de tratar um evento, o serviço o confirma (XACK).
+Como as peças se encaixam:
 
-Se o tratamento falhar (por exemplo, um tratador ainda não implementado), o
-evento NÃO é confirmado: fica pendente e é reprocessado quando o serviço
-reiniciar, o que acontece sozinho sempre que você salva o código. Assim,
-nenhuma etapa da saga se perde.
+    publicar ──▶ EXCHANGE "saga.eventos" ──(bindings)──▶ FILA de cada serviço ──▶ consumir
+
+- O exchange é do tipo *topic*: a routing key de cada mensagem é o TIPO do
+  evento (ex.: "EstoqueReservado").
+- Cada serviço tem a SUA fila e assina só os tipos que sabe tratar: um
+  binding para cada chave do dicionário TRATADORES.
+- A fila "saga.historico" assina "#" (todos os eventos). É dela que sai a
+  linha do tempo de /pedidos/<id>/historico.
+- Filas e mensagens são duráveis: se um serviço estiver fora do ar, os
+  eventos esperam na fila dele.
+- Depois de tratar um evento, o serviço o confirma (ack). Se o tratamento
+  falhar (por exemplo, um tratador ainda não implementado), o evento NÃO é
+  confirmado: fica "Unacked" e volta para a fila quando o serviço reinicia,
+  o que acontece sozinho sempre que você salva o código.
 
 Este arquivo é infraestrutura: você não precisa alterá-lo no tutorial.
 """
@@ -17,93 +25,96 @@ import json
 import time
 from typing import Callable
 
-import redis
+import pika
+from pika.exceptions import AMQPError
 
-STREAM_SAGA = "saga.eventos"
-CONSUMIDOR = "consumidor-1"
+EXCHANGE = "saga.eventos"
+FILA_HISTORICO = "saga.historico"
 
 
 class Barramento:
-    def __init__(self, url: str, servico: str, stream: str = STREAM_SAGA) -> None:
+    def __init__(self, url: str, servico: str) -> None:
+        self.url = url
         self.servico = servico
-        self.stream = stream
-        self.redis = redis.Redis.from_url(url, decode_responses=True)
 
-    def publicar(self, evento: dict, origem: str | None = None) -> str:
-        return self.redis.xadd(self.stream, {
-            "tipo": evento["tipo"],
-            "origem": origem or self.servico,
-            "dados": json.dumps(evento["dados"], ensure_ascii=False),
-        })
-
-    def historico(self, filtro: Callable[[dict], bool] = lambda _evento: True) -> list[dict]:
-        """Todos os eventos já publicados (em ordem) que passam pelo filtro."""
-        eventos = []
-        for id_mensagem, campos in self.redis.xrange(self.stream):
-            evento = self._decodificar(campos)
-            if filtro(evento):
-                eventos.append({"publicado_em_ms": int(id_mensagem.split("-")[0]), **evento})
-        return eventos
-
-    def consumir(self, ao_receber: Callable[[dict], None]) -> None:
-        """Entrega cada evento do stream a ``ao_receber``. Nunca retorna."""
-        self._aguardar_redis()
+    # --- publicar -------------------------------------------------------------
+    def publicar(self, evento: dict, origem: str | None = None) -> None:
+        """Publica um evento usando uma conexão curta (fora do consumidor)."""
+        conexao = self._conectar()
         try:
-            self.redis.xgroup_create(self.stream, self.servico, id="0", mkstream=True)
-        except redis.ResponseError as erro:
-            if "BUSYGROUP" not in str(erro):  # o grupo já existe: tudo bem
-                raise
+            canal = conexao.channel()
+            canal.exchange_declare(EXCHANGE, exchange_type="topic", durable=True)
+            self._publicar_no_canal(canal, evento, origem)
+        finally:
+            conexao.close()
 
-        # 1) eventos pendentes: recebidos antes, mas não confirmados
-        ultimo_pendente = "0"
-        while True:
-            resposta = self.redis.xreadgroup(self.servico, CONSUMIDOR, {self.stream: ultimo_pendente}, count=100)
-            mensagens = resposta[0][1] if resposta else []
-            if not mensagens:
-                break
-            for id_mensagem, campos in mensagens:
-                self._processar(id_mensagem, campos, ao_receber, reprocessando=True)
-                ultimo_pendente = id_mensagem
+    def _publicar_no_canal(self, canal, evento: dict, origem: str | None = None) -> None:
+        canal.basic_publish(
+            exchange=EXCHANGE,
+            routing_key=evento["tipo"],
+            body=json.dumps(evento["dados"], ensure_ascii=False).encode(),
+            properties=pika.BasicProperties(
+                content_type="application/json",
+                delivery_mode=pika.DeliveryMode.Persistent,  # sobrevive a um restart do RabbitMQ
+                type=evento["tipo"],
+                app_id=origem or self.servico,
+                headers={"publicado_em_ms": int(time.time() * 1000)},
+            ),
+        )
 
-        # 2) eventos novos, para sempre
+    # --- consumir -------------------------------------------------------------
+    def consumir(self, fila: str, assinaturas: list[str], ao_receber: Callable[[dict], list],
+                 ao_ficar_pronto: Callable[[], None] = lambda: None) -> None:
+        """Cria a fila, assina os tipos de evento e entrega cada evento a
+        ``ao_receber``, que devolve a lista de eventos a publicar. Nunca retorna."""
         while True:
+            conexao = self._conectar()
             try:
-                resposta = self.redis.xreadgroup(self.servico, CONSUMIDOR, {self.stream: ">"}, count=10, block=5000)
-            except redis.ConnectionError:
-                print(f"[{self.servico}] Redis indisponível, tentando de novo em 2s...")
-                time.sleep(2)
-                continue
-            for _stream, mensagens in resposta or []:
-                for id_mensagem, campos in mensagens:
-                    self._processar(id_mensagem, campos, ao_receber)
+                canal = conexao.channel()
+                canal.exchange_declare(EXCHANGE, exchange_type="topic", durable=True)
+                canal.queue_declare(fila, durable=True)
+                for routing_key in assinaturas:
+                    canal.queue_bind(fila, EXCHANGE, routing_key=routing_key)
+                canal.basic_qos(prefetch_count=50)  # um evento travado não impede os seguintes
 
-    def _processar(self, id_mensagem: str, campos: dict, ao_receber, reprocessando: bool = False) -> None:
-        if not campos:  # evento pendente que já foi apagado do stream
-            self.redis.xack(self.stream, self.servico, id_mensagem)
-            return
-        evento = self._decodificar(campos)
-        if reprocessando:
+                def ao_chegar(canal, entrega, propriedades, corpo):
+                    self._processar(canal, entrega, propriedades, corpo, ao_receber)
+
+                canal.basic_consume(fila, on_message_callback=ao_chegar)
+                ao_ficar_pronto()
+                canal.start_consuming()
+            except AMQPError as erro:
+                print(f"[{self.servico}] conexão com o RabbitMQ caiu ({type(erro).__name__}); reconectando...")
+                time.sleep(2)
+
+    def _processar(self, canal, entrega, propriedades, corpo: bytes, ao_receber) -> None:
+        evento = {
+            "tipo": propriedades.type or entrega.routing_key,
+            "origem": propriedades.app_id or "?",
+            "publicado_em_ms": (propriedades.headers or {}).get("publicado_em_ms", int(time.time() * 1000)),
+            "dados": json.loads(corpo),
+        }
+        if entrega.redelivered:
             print(f"[{self.servico}] reprocessando evento pendente: {evento['tipo']}")
         try:
-            ao_receber(evento)
+            novos_eventos = ao_receber(evento)
         except NotImplementedError as erro:
             print(f"[{self.servico}] ⚠ {evento['tipo']} NÃO tratado: {erro}. "
-                  "O evento ficou PENDENTE e será reprocessado quando você salvar o código.")
+                  "O evento ficou PENDENTE (Unacked) e volta para a fila quando você salvar o código.")
             return
         except Exception as erro:  # noqa: BLE001 - não derruba o consumidor
             print(f"[{self.servico}] ⚠ erro ao tratar {evento['tipo']}: {type(erro).__name__}: {erro}. "
-                  "O evento ficou PENDENTE e será reprocessado quando você salvar o código.")
+                  "O evento ficou PENDENTE (Unacked) e volta para a fila quando você salvar o código.")
             return
-        self.redis.xack(self.stream, self.servico, id_mensagem)
+        for novo in novos_eventos:
+            self._publicar_no_canal(canal, novo)
+            print(f"[{self.servico}]   → publicou {novo['tipo']} (pedido {novo['dados'].get('pedido_id')})")
+        canal.basic_ack(entrega.delivery_tag)  # confirma: o RabbitMQ pode apagar a mensagem
 
-    @staticmethod
-    def _decodificar(campos: dict) -> dict:
-        return {"tipo": campos["tipo"], "origem": campos.get("origem", "?"), "dados": json.loads(campos["dados"])}
-
-    def _aguardar_redis(self) -> None:
+    def _conectar(self) -> pika.BlockingConnection:
         while True:
             try:
-                self.redis.ping()
-                return
-            except redis.ConnectionError:
-                time.sleep(1)
+                return pika.BlockingConnection(pika.URLParameters(self.url))
+            except AMQPError:
+                print(f"[{self.servico}] RabbitMQ indisponível, tentando de novo em 2s...")
+                time.sleep(2)

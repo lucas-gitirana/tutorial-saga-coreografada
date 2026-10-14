@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1030 310" width="100%" font-family="Segoe UI, Helvetica, Arial, sans-serif">
 <rect x="1" y="1" width="1028" height="308" rx="10" fill="#ffffff" stroke="#dee2e6"/>
-<text x="515" y="26" text-anchor="middle" font-size="13" fill="#868e96">Cada seta é um evento no Redis (stream saga.eventos). Nenhum serviço chama o outro.</text>
+<text x="515" y="26" text-anchor="middle" font-size="13" fill="#868e96">Cada seta é um evento: publicado no RabbitMQ e entregue na fila de quem assina. Nenhum serviço chama o outro.</text>
 <polyline points="107,150 150.0,150.0" fill="none" stroke="#adb5bd" stroke-width="2" stroke-linejoin="round"/>
 <polygon points="158,150 147.0,156.0 147.0,144.0" fill="#adb5bd"/>
 <text x="132" y="140" text-anchor="middle" font-size="12" fill="#adb5bd" font-weight="400">POST</text>

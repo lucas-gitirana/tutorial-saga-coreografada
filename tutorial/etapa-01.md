@@ -15,7 +15,7 @@ Devem aparecer **4 containers** com estado `running (healthy)`:
 | `pedidos` | começa a saga e guarda o desfecho (porta 8031) |
 | `estoque` | reserva os produtos (porta 8032) |
 | `pagamentos` | cobra o cliente (porta 8033) |
-| `redis` | por onde passam **todas as setas** (os eventos) |
+| `rabbitmq` | o "correio": por onde passam **todas as setas** (os eventos) |
 
 O `docker-compose.yml`, aberto ao lado, descreve esses quatro containers.
 
@@ -31,6 +31,9 @@ curl -s localhost:8033/carteiras
 
 Guarde dois números, eles vão importar: há só **2 monitores** no estoque, e o
 **bruno** tem só **R$ 100** na carteira.
+
+> 👀 Quer ver o correio por dentro? Abra o painel do RabbitMQ em
+> <http://localhost:15672> (usuário e senha: `guest`) e clique em **Queues**.
 
 > Algum container não está `healthy`? Rode `docker compose up -d --build --wait` de novo.
 

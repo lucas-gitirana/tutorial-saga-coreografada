@@ -51,6 +51,26 @@ destacando a parte em que você está:
 | `PagamentoAprovado` | pagamentos | pedidos confirma |
 | `PagamentoRecusado` | pagamentos | pedidos cancela **e** estoque **compensa** |
 
+## O carteiro: RabbitMQ
+
+Os serviços nunca falam diretamente entre si. Todo evento passa pelo
+**RabbitMQ**, um *message broker*: um "correio" de mensagens.
+
+| Termo | No correio | Aqui |
+| --- | --- | --- |
+| **Exchange** | o centro de triagem | `saga.eventos`: recebe todo evento publicado |
+| **Fila** (*queue*) | a caixa postal de cada um | uma por serviço: `pedidos`, `estoque`, `pagamentos` |
+| **Binding** | a assinatura: "quero receber cartas do tipo X" | ex.: a fila `pagamentos` assina `EstoqueReservado` |
+| **Ack** | o carimbo de "recebido e resolvido" | o serviço confirma depois de tratar o evento; só então a mensagem sai da fila |
+
+```text
+pedidos ── PedidoCriado ──▶ [ exchange saga.eventos ] ──▶ fila estoque         (assina PedidoCriado)
+                                                     └──▶ fila saga.historico  (assina tudo: #)
+```
+
+Quem publica **não sabe** quem vai receber: o exchange entrega uma cópia em
+cada fila que assinou aquele tipo de evento.
+
 ## As ferramentas
 
 | Peça | O que é | Papel aqui |
@@ -58,7 +78,7 @@ destacando a parte em que você está:
 | **Docker Compose** | sobe vários containers com um único comando, a partir do `docker-compose.yml` | liga os 4 containers |
 | **Flask** | microframework web em Python | faz a API HTTP de cada serviço |
 | **Arquivo JSON** | um arquivo em um volume Docker separado para cada serviço | o **banco próprio** de cada serviço |
-| **Redis** | banco em memória, muito rápido. Tem os *Streams*: listas de mensagens que só crescem, sempre em ordem | **barramento de eventos**: todas as setas do mapa passam por ele |
+| **RabbitMQ** | *message broker*: recebe mensagens e entrega nas filas certas. Tem um painel web | **barramento de eventos**: todas as setas do mapa passam por ele |
 | **curl** | faz requisições HTTP pelo terminal | é o "cliente" que você vai usar |
 
 ## Como funciona este tutorial
