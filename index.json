@@ -82,5 +82,9 @@
   },
   "backend": {
     "imageid": "docker-compose:tutorial-saga-coreografada"
+  },
+  "report": {
+    "endpoint": "https://script.google.com/macros/s/AKfycbwGGrRjxwdpi5RH2VwUK8Tey17A0pQk9AawNe5z2ttNYhBvw0KbIEEPJc-Ev09r6t41pg/exec",
+    "token": "devops-2026-2"
   }
 }
