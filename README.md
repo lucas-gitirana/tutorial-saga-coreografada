@@ -14,7 +14,7 @@ reserva de estoque.
 
 1. Clique em **Code → Codespaces → Create codespace on main**.
 2. Aguarde o ambiente abrir. Docker e Python já vêm instalados.
-3. Instale a extensão **Tutoriais Interativos de Microsserviços** (veja abaixo).
+3. Aguarde a instalação automática da extensão **Tutoriais Interativos de Microsserviços** finalizar (verifique se no console consta o log _Extensão instalada: .devcontainer/tutoriais-interativos-microsservicos-0.1.0.vsix_).
 
 ### Opção 2: na sua máquina
 
