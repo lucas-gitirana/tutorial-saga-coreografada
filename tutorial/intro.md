@@ -107,3 +107,11 @@ terminal voltar ao prompt, clique em **Começar**.
 
 > Pré-requisitos: Docker com Docker Compose e Python 3 (usado pelas
 > verificações). No GitHub Codespaces já vem tudo instalado.
+
+## Formulários de perfil e pré-teste:
+Antes de iniciar o tutorial, responda a esses dois formulários abaixo:
+- [Formulário de Perfil][]
+- [Formulário de Pré-teste][]
+
+[Formulário de Perfil]: https://docs.google.com/forms/d/e/1FAIpQLSd0sK7DuFHo7JzWoHxSpauYSRYfiCzqHszTFwsh25rBAU6m2g/viewform?usp=sharing&ouid=103537969988084746732
+[Formulário de Pré-teste]: https://docs.google.com/forms/d/e/1FAIpQLSdiIJ2U3Yjzb7q6o8DKFyRxj4F5EdnL8DijGYLrFEKk9i83Ow/viewform?usp=sharing&ouid=103537969988084746732
