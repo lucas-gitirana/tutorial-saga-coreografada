@@ -19,8 +19,8 @@ pagamento falhou é o `pagamentos`.
 
 ## ✏️ Faça
 
-Abaixo do marcador **Etapa 8**, escreva o código (igual ao da Etapa 7) e
-complete o `___`:
+Abaixo do marcador **Etapa 8**, cole o código abaixo (igual ao da Etapa 7) e
+complete o `___` com `dados["motivo"]`:
 
 ```python
     if pedido is None:

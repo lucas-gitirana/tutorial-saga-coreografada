@@ -35,7 +35,7 @@ o pedido já foi cobrado. Ignore o evento.**
 
 ## ✏️ Faça
 
-Abaixo do marcador **Etapa 6** (o primeiro da função), complete o `___`:
+Abaixo do marcador **Etapa 6** (o primeiro da função), cole o código abaixo e complete o `___` com `"pagamentos"`:
 
 ```python
     if pedido_id in estado[___]:

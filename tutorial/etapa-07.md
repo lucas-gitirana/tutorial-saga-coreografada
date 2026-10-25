@@ -39,8 +39,8 @@ evento está pendente no `pedidos`.
 `_pedido_pendente` (já pronta) devolve o pedido **só se ele ainda estiver
 `PENDENTE`**. Se ele não existe ou já teve desfecho, devolve `None`.
 
-Abaixo do marcador **Etapa 7**, escreva o código, seguindo o exemplo
-`ao_pagamento_aprovado` logo acima no arquivo. Complete o `___`:
+Abaixo do marcador **Etapa 7**, cole o código abaixo, seguindo o exemplo
+`ao_pagamento_aprovado` logo acima no arquivo. Complete o `___` com `"CANCELADO"`:
 
 ```python
     if pedido is None:

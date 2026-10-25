@@ -14,7 +14,7 @@
 Um **tratador** é uma função que recebe um evento, altera o banco do serviço e
 devolve os eventos que quer publicar.
 
-**Entra** (publicado pelo estoque):
+Estrutura do evento que **entra** (publicado pelo estoque):
 
 ```json
 {
@@ -23,7 +23,7 @@ devolve os eventos que quer publicar.
 }
 ```
 
-**Sai** (o `pedidos` vai ouvir):
+Estrutura do evento que **sai** (o `pedidos` vai ouvir):
 
 ```json
 {
@@ -36,6 +36,7 @@ O `pagamentos` não sabe **quem** vai ouvir o `PagamentoAprovado`. Ele só
 publica. Cada serviço conhece **eventos**, não outros serviços.
 
 ## 🐍 Python rápido
+A lista `estado` representa o banco do serviço. Sendo assim:
 
 | Código | Significa |
 | --- | --- |
@@ -45,8 +46,8 @@ publica. Cada serviço conhece **eventos**, não outros serviços.
 
 ## ✏️ Faça
 
-Abaixo do marcador **Etapa 4** (o último da função), escreva as 3 linhas e
-complete os `___`:
+Abaixo do marcador **Etapa 4** (o último da função), cole as 3 linhas abaixo e
+complete os dois `___` com a variável `valor`:
 
 ```python
     estado["saldos"][cliente] = saldo - ___

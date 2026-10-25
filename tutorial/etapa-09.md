@@ -33,7 +33,7 @@ que aconteceu, e uma segunda compensação do mesmo pedido pode ser ignorada.
 
 ## ✏️ Faça
 
-Abaixo do marcador **Etapa 9**, escreva o código e complete os `___`:
+Abaixo do marcador **Etapa 9**, cole o código e complete o primeiro `___` com `quantidade` e o segundo com `"LIBERADA"`:
 
 ```python
     if reserva is None or reserva["status"] != "RESERVADA":

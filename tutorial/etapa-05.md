@@ -24,8 +24,7 @@ if saldo < valor:
 
 ## ✏️ Faça
 
-Abaixo do marcador **Etapa 5** (acima do que você escreveu na Etapa 4),
-escreva o `if` e complete os `___`:
+Abaixo do marcador **Etapa 5** (acima do que você escreveu na Etapa 4), cole o bloco de código abaixo e complete o primeiro `___` com `"RECUSADO"` e o segundo `___` com `"saldo insuficiente"`:
 
 ```python
     if saldo < valor:
@@ -33,8 +32,6 @@ escreva o `if` e complete os `___`:
         return [evento("PagamentoRecusado", pedido_id=pedido_id, cliente=cliente, valor_total=valor,
                        motivo=___)]
 ```
-
-> Dica: o status é `"RECUSADO"` e o motivo pode ser `"saldo insuficiente"`.
 
 **Salve** (`Ctrl+S`).
 
